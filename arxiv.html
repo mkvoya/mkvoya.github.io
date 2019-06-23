@@ -4,14 +4,15 @@
 <html>
   <head>
     <title> arXiv parser </title>
-    <!--
-      <link rel="stylesheet" href="https://dong.mk/file/concise.min.css" />
-      <link rel="stylesheet" href="https://cdn.concisecss.com/concise-ui/concise-ui.min.css" />
-    -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.5.3/css/bulma.min.css">
+<style>
+a {
+  color: #008f7a;
+}
+</style>
   </head>
   <body>
-    <section class="hero">
+    <section class="hero is-primary">
       <div class="hero-body">
         <div class="container">
           <h1 class="title">
@@ -23,18 +24,21 @@
       </div>
     </section>
 
-    <section container>
+    <section class='container'>
+      <label>
+        Paste email content below and press Parse
+      </label>
       <textarea id='input' class="textarea"></textarea>
       <a class="button" onclick="parse();">Parse</a>
       <a class="button" onclick="reset();">Reset</a>
     </section>
 
-    <section container>
+    <section class='container'>
       <table class="table">
         <thead>
           <tr>
             <th scope="col">Title</th>
-            <th scope="col">URL</th>
+            <th scope="col">Categories</th>
             <th scope="col">Authors</th>
           </tr>
         </thead>
@@ -54,7 +58,7 @@
           var url = '';
           var authors = '';
           let regex = new RegExp(
-`arXiv:(?<id>.*?)
+`arXiv:(?<id>[0-9.]*?)
 (.*?)
 Title:(?<title>.*?)
 Authors:(?<authors>.*?)
@@ -66,18 +70,19 @@ Categories:(?<categories>.*?)
             id = match[1];
             title = match[3];
             authors = match[4];
+            categories = match[5];
             url = 'https://arxiv.org/abs/' + id;
             var tr = document.createElement('tr');
             var td;
             td = document.createElement('td');
-            td.innerText = title;
-            tr.appendChild(td);
-            td = document.createElement('td');
             var a = document.createElement('a');
-            a.innerText = url;
+            a.innerText = title;
             a.href = url;
             a.target = '_blank';
             td.appendChild(a);
+            tr.appendChild(td);
+            td = document.createElement('td');
+            td.innerText = categories;
             tr.appendChild(td);
             td = document.createElement('td');
             td.innerText = authors;
