@@ -48,6 +48,9 @@ a {
       </table>
     </section>
       <script type='text/javascript'>
+        function markKeywords(txt) {
+          return txt;
+        }
         function reset() {
           document.getElementById("input").value = '';
           document.getElementById('result').innerHTML = '';
@@ -68,9 +71,9 @@ Categories:(?<categories>.*?)
           var match;
           while ((match = regex.exec(text)) !== null) {
             id = match[1];
-            title = match[3];
-            authors = match[4];
-            categories = match[5];
+            title = markKeywords(match[3]);
+            authors = markKeywords(match[4]);
+            categories = markKeywords(match[5]);
             url = 'https://arxiv.org/abs/' + id;
             var tr = document.createElement('tr');
             var td;

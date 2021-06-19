@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+  <head>
+    <title> Conference Picker </title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.0/css/bulma.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/underscore@1.13.1/underscore-umd-min.js" type="text/javascript"></script>
+    <style>
+      a {
+          color: #008f7a;
+      }
+    </style>
+  </head>
+  <body>
+
+    <section class="hero is-primary">
+      <div class="hero-body">
+        <div class="container">
+          <h1 class="title"> Picking A Conference Randomly </h1>
+          <h2 class="subtitle"> A tool that helps you choose a conference.</h2>
+        </div>
+      </div>
+    </section>
+
+    <span class="tag is-success" id="conf_template" style="display: none;"> CONF_NAME <button class="delete is-small"></button></span>
+
+    <section class='container'>
+      <div style="margin-top: 1rem ">
+        <label for="conf_list">
+          A List of Conferences to Choose From
+        </label>
+        <div class="block" id="conf_list" name="conf_list">
+          <span class="tag is-success conf"> FAST <button class="delete is-small"></button> </span>
+          <span class="tag is-success conf"> OSDI <button class="delete is-small"></button> </span>
+          <span class="tag is-success conf"> SOSP <button class="delete is-small"></button> </span>
+          <span class="tag is-success conf"> NSDI <button class="delete is-small"></button> </span>
+          <span class="tag is-success conf"> ASPLOS <button class="delete is-small"></button> </span>
+          <span class="tag is-success conf"> USENIX ATC <button class="delete is-small"></button> </span>
+          <span class="tag is-success"> <input type="text" placeholder="New" style="background-color: rgba(0,0,0,0); color: white; width: 100%;"></input><a class="is-small" onclick="conf_add();">+</a> </span>
+        </div>
+      </div>
+      <div>
+        Year <input type="number" value="1999" id="year_start"></input> to <input type="number" value="2021" id="year_end"></input>
+      </div>
+      <a class="button" onclick="pick();">PICK!</a>
+      <h2 class="button" id="result"></h2>
+    </script>
+
+    </section>
+
+      <script type='text/javascript'>
+        function _$(x) { return document.querySelector(x); }
+        function _$$(x) { return document.querySelectorAll(x); }
+        function pick() {
+            let confs = [];
+            _$$(".conf").forEach((x) => {
+                confs.push(x.innerText);
+            });
+            const conf = confs[Math.floor(confs.length * Math.random())];
+            const year_start = parseInt(_$("#year_start").value);
+            const year_end = parseInt(_$("#year_end").value);
+            const year = year_start + Math.floor(Math.random() * (year_end - year_start));
+
+            _$("#result").innerText = conf + " " + year;
+        }
+        function conf_add() {
+            let newitem = _$("#conf_template").cloneNode();
+            newitem.innerText = "HIHIHI";
+            _$("#conf_list").appendChild(newitem);
+        }
+      </script>
+
+
+  </body>
+</html>
