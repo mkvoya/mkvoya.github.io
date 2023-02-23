@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+ <head>
+  <title> Pick Someone For Q&amp;A </title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css" />
+ </head>
+ <body>
+   <input type="file" name="inputfile" id="inputfile" />
+   <br />
+   <button id='button'>ok</button>
+   <br />
+   <div id='ans' style="font-size:100pt;"> </div>
+
+   <pre id="output"></pre>
+
+   <script type="text/javascript">
+     var names = []
+     document.getElementById('button').addEventListener('click', function() {
+         let all = names.length;
+         let idx = Math.floor(Math.random() * all);
+         document.getElementById('ans').textContent = names[idx];
+     })
+     window.onkeydown = function(event){
+         if (event.keyCode === 32) {
+             event.preventDefault();
+             document.querySelector('#button').click();
+         }
+     };
+     document.getElementById('inputfile').addEventListener('change', function() {
+         var fr = new FileReader();
+         fr.onload = function(){
+             names = []
+             content = fr.result.split('\n');
+             for (var i in content) {
+                 name = content[i].split(',')[0]
+                 names.push(name)
+             }
+             document.getElementById('output').textContent = names.join("\n")
+         }
+         fr.readAsText(this.files[0]);
+     })
+   </script>
+ </body>
+</html>
