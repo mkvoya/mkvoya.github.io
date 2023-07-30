@@ -1,0 +1,145 @@
+<!-- vim:sts=2 ts=2 sw=2 expandtab
+-->
+<!doctype html>
+<html>
+  <head>
+    <title> Google Scholar Mail Parser </title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css" integrity="sha512-HqxHUkJM0SYcbvxUw5P60SzdOTy/QVwA1JJrvaXJv4q7lmbDZCmZaqz01UPOaQveoxfYRv1tHozWGPMcuTBuvQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<style>
+a {
+  color: #008f7a;
+}
+#drop_zone {
+  margin: 10px;
+  border: 3px solid green;
+  width: 100%;
+  height: 100px;
+}
+</style>
+  </head>
+  <body>
+    <section class="hero is-primary">
+      <div class="hero-body">
+        <div class="container">
+          <h1 class="title">
+            Google Scholar Mail Parser
+          </h1>
+          <h2 class="subtitle">
+          </h2>
+        </div>
+      </div>
+    </section>
+
+    <section class='container'>
+      <div
+        id="drop_zone"
+        ondrop="dropHandler(event);"
+        ondragover="dragOverHandler(event);">
+        <p>Drag one or more .eml files to this <i>drop zone</i>.</p>
+      </div>
+      <a class="button" onclick="reset();">Reset</a>
+    </section>
+
+
+    <section class='container'>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Title</th>
+            <th scope="col">Categories</th>
+            <th scope="col">Authors</th>
+          </tr>
+        </thead>
+
+        <tbody id='result'>
+        </tbody>
+      </table>
+    </section>
+      <script type='text/javascript'>
+        let entries = {};
+
+        function parse_eml(text) {
+            let content = text.substr(text.search("--==="));
+            content = content.substr(content.search("\n\n"));
+            content = content.substr(0, content.search("--==="));
+            // content = content.replaceAll("\n", "");
+            content = content.split('\n').map((x)=>x.trim()).reduce((x,y)=>x+y)
+
+            parser = new DOMParser();
+            doc = parser.parseFromString(content, "text/html");
+            doc.querySelectorAll(".gse_alrt_title").forEach((a) => {
+                let title = a.innerText;
+                if (title in entries)
+                    return;
+                let url = a.href;
+                let authors = a.parentElement.nextElementSibling.innerText;
+                entries[title] = [title, url, authors];
+                var tr = document.createElement('tr');
+                var td;
+                td = document.createElement('td');
+                var a = document.createElement('a');
+                a.innerText = title;
+                a.href = url;
+                a.target = '_blank';
+                td.appendChild(a);
+                tr.appendChild(td);
+                td = document.createElement('td');
+                td.innerText = 'gscholar';
+                tr.appendChild(td);
+                td = document.createElement('td');
+                td.innerText = authors;
+                tr.appendChild(td);
+                document.getElementById('result').appendChild(tr);
+            });
+            console.log(content.length);
+        }
+
+        function dragOverHandler(ev) {
+            // console.log("File(s) in drop zone");
+            // Prevent default behavior (Prevent file from being opened)
+            ev.preventDefault();
+        }
+
+        function dropHandler(ev) {
+            console.log("File(s) dropped");
+
+            // Prevent default behavior (Prevent file from being opened)
+            ev.preventDefault();
+
+            if (ev.dataTransfer.items) {
+                // Use DataTransferItemList interface to access the file(s)
+                [...ev.dataTransfer.items].forEach((item, i) => {
+                    // If dropped items aren't files, reject them
+                    if (item.kind === "file") {
+                        const file = item.getAsFile();
+                        console.log(`… file[${i}].name = ${file.name}`);
+                        const reader = new FileReader();
+                        reader.addEventListener('load', (event) => {
+                            parse_eml(event.target.result);
+                        });
+                        reader.readAsText(file);
+                    }
+                });
+            } else {
+                // Use DataTransfer interface to access the file(s)
+                [...ev.dataTransfer.files].forEach((file, i) => {
+                    console.log(`… file[${i}].name = ${file.name}`);
+                    const reader = new FileReader();
+                    reader.addEventListener('load', (event) => {
+                        parse_eml(event.target.result);
+                    });
+                    reader.readAsText(file);
+                });
+            }
+        }
+
+        function reset() {
+          document.getElementById('result').innerHTML = '';
+          entries = {};
+        }
+
+      </script>
+
+
+  </body>
+</html>
