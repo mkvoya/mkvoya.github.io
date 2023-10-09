@@ -130,7 +130,7 @@ Categories:(?<categories>.*?)
                         console.log(`… file[${i}].name = ${file.name}`);
                         const reader = new FileReader();
                         reader.addEventListener('load', (event) => {
-                            parse(event.target.result);
+                            parse_text(event.target.result);
                         });
                         reader.readAsText(file);
                     }
@@ -141,7 +141,7 @@ Categories:(?<categories>.*?)
                     console.log(`… file[${i}].name = ${file.name}`);
                     const reader = new FileReader();
                     reader.addEventListener('load', (event) => {
-                        parse(event.target.result);
+                        parse_text(event.target.result);
                     });
                     reader.readAsText(file);
                 });
