@@ -9,6 +9,12 @@
 a {
   color: #008f7a;
 }
+#drop_zone {
+  margin: 10px;
+  border: 3px solid green;
+  width: 50px;
+  height: 50px;
+}
 </style>
   </head>
   <body>
@@ -26,9 +32,18 @@ a {
 
     <section class='container'>
       <label>
-        Paste email content below and press Parse
+        Paste email content below and press Parse.
       </label>
       <textarea id='input' class="textarea"></textarea>
+      <label>
+        Or drop file(s) below.
+      </label>
+      <div
+        id="drop_zone"
+        ondrop="dropHandler(event);"
+        ondragover="dragOverHandler(event);">
+        <p>Or drop .eml file(s) here.</p>
+      </div>
       <a class="button" onclick="parse();">Parse</a>
       <a class="button" onclick="reset();">Reset</a>
     </section>
@@ -57,6 +72,9 @@ a {
         }
         function parse() {
           var text = document.getElementById("input").value;
+          return parse_text(text);
+        }
+        function parse_text(text) {
           var title = '';
           var url = '';
           var authors = '';
@@ -92,6 +110,45 @@ Categories:(?<categories>.*?)
             tr.appendChild(td);
             document.getElementById('result').appendChild(tr);
           }
+        }
+
+        function dragOverHandler(ev) {
+            // console.log("File(s) in drop zone");
+            // Prevent default behavior (Prevent file from being opened)
+            ev.preventDefault();
+        }
+
+        function dropHandler(ev) {
+            console.log("File(s) dropped");
+
+            // Prevent default behavior (Prevent file from being opened)
+            ev.preventDefault();
+
+            if (ev.dataTransfer.items) {
+                // Use DataTransferItemList interface to access the file(s)
+                [...ev.dataTransfer.items].forEach((item, i) => {
+                    // If dropped items aren't files, reject them
+                    if (item.kind === "file") {
+                        const file = item.getAsFile();
+                        console.log(`… file[${i}].name = ${file.name}`);
+                        const reader = new FileReader();
+                        reader.addEventListener('load', (event) => {
+                            parse(event.target.result);
+                        });
+                        reader.readAsText(file);
+                    }
+                });
+            } else {
+                // Use DataTransfer interface to access the file(s)
+                [...ev.dataTransfer.files].forEach((file, i) => {
+                    console.log(`… file[${i}].name = ${file.name}`);
+                    const reader = new FileReader();
+                    reader.addEventListener('load', (event) => {
+                        parse(event.target.result);
+                    });
+                    reader.readAsText(file);
+                });
+            }
         }
       </script>
 
