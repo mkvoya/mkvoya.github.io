@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>酬金汇总</title>
+    <!--
+<script src="./xlsx.full.min.js"></script>
+<script src="./gridjs.umd.js"></script>
+<link rel="stylesheet" type="text/css" href="./mermaid.min.css">
+-->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha256-yVBhl8r4CaB1tt7h2g02+xnacVj/6KiOewyWxdhiPJk=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css">
+  </head>
+  <body>
+    <section class="hero">
+      <div class="hero-body">
+        <p class="title"> 酬金汇总(Excel) </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container" ondrop="dropHandler(event);"
+        ondragover="dragOverHandler(event);">
+        <label for="inputfile"> 
+          <div
+            class="is-large is-outlined is-info box"
+          >
+            <p>点击上传，或拖拽 .xlsx 文件到此处（可一次性拖拽多个文件）</p>
+          </div>
+        </label>
+        <input type="file" name="inputfile" id="inputfile" style="display: none;">
+      </div>
+    </section>
+
+    <section class="section result">
+      <div class="container">
+        <div id='errorlist'> </div>
+      </div>
+      <button class="button" id="export">导出Excel</button>
+      <div class="container">
+        <div id="summary-table"></div>
+      </div>
+    </section>
+
+    <script type="text/javascript">
+    function dragOverHandler(ev) {
+      // console.log("File(s) in drop zone");
+      // Prevent default behavior (Prevent file from being opened)
+      ev.preventDefault();
+    }
+
+    function dropHandler(ev) {
+      console.log("File(s) dropped");
+
+      // Prevent default behavior (Prevent file from being opened)
+      ev.preventDefault();
+
+      if (ev.dataTransfer.items) {
+        // Use DataTransferItemList interface to access the file(s)
+        [...ev.dataTransfer.items].forEach((item, i) => {
+          // If dropped items aren't files, reject them
+          if (item.kind === "file") {
+            const file = item.getAsFile();
+            console.log(`… file[${i}].name = ${file.name}`);
+            const reader = new FileReader();
+            reader.addEventListener('load', (event) => {
+              parse_xlsx(event.target.result);
+            });
+            reader.readAsArrayBuffer(file);
+          }
+        });
+      } else {
+        // Use DataTransfer interface to access the file(s)
+        [...ev.dataTransfer.files].forEach((file, i) => {
+          console.log(`… file[${i}].name = ${file.name}`);
+          const reader = new FileReader();
+          reader.addEventListener('load', (event) => {
+            parse_xlsx(event.target.result);
+          });
+          fr.readAsArrayBuffer(file);
+        });
+      }
+    }
+
+    var details = []
+    var summary = []
+
+    function report_error(msg) {
+      console.log(msg);
+      errlist = document.getElementById('errorlist');
+      errlist.innerHTML += "<p>" + msg + "</p>";
+    }
+
+    function parse_xlsx(xlsx_arraybuffer)  {
+      const workbook = XLSX.read(xlsx_arraybuffer, { cellFormula: true, sheetStubs: true });
+      /* get first worksheet */
+      for (sheetname of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetname];
+        const rows = XLSX.utils.sheet_to_row_object_array(worksheet);
+        for (row of rows) {
+          id = '' + row['学号']
+          name = row['姓名'] || row['助教姓名'];
+          salary = row['酬金'] || row['拟发放工资'] || row['总金额'] || 0;
+          let msg = `ID=${id}, name=${name}, salary=${salary}`;
+          if (name === undefined)
+          report_error("姓名有误!" + msg);
+          if (salary === undefined)
+          report_error("酬金有误!" + msg);
+          if (id === undefined) 
+          report_error("学号有误!" + msg);
+          details.push({ id: id, name: name, salary: salary, type: sheetname});
+        }
+      }
+      console.log(details);
+      //initialize table
+      // var table = new Tabulator("#detail-table", {
+      //   data: details, //assign data to table
+      //   autoColumns: true, //create columns from data field names
+      // });
+      summary = summarize(details);
+      sum = []
+      for (s in summary) {
+        sum.push(summary[s]);
+      }
+
+
+      new gridjs.Grid({ 
+        // columns: ['Name', 'Email'],
+        data: sum,
+      }).render(document.getElementById('summary-table'));
+    }
+
+    function summarize(details) {
+      var s = {}
+      for (k in details) {
+        d = details[k]
+        if (s[d.id]) {
+          if (s[d.id].name != d.name) {
+            report_error("名字不匹配: " + d.id + " " + d.name + ' ' + s[d.id].name);
+            return {};
+          }
+          s[d.id].total += d.salary;
+          s[d.id].details += "  " + d.type + ":" + d.salary;
+        } else {
+          s[d.id] = {id: d.id, name: d.name, total: d.salary, details: "" + d.type + ":" + d.salary};
+        }
+      }
+      return s;
+    }
+
+    document.getElementById('inputfile').addEventListener('change', async function() {
+      var fr = new FileReader();
+      fr.onload = function(){ parse_xlsx(fr.result); }
+      fr.readAsArrayBuffer(this.files[0]);
+    })
+    document.getElementById("export").addEventListener('click', function() {
+      /* Create worksheet from HTML DOM TABLE */
+      var aoa = [["学号", "姓名", "总酬金", "备注"]];
+      for (let k in summary) {
+        s = summary[k];
+        aoa.push([s.id, s.name, s.total, s.details])
+      }
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      /* Export to file (start a download) */
+      XLSX.writeFile(wb, "export.xlsx");
+    });
+    </script>
+
+  </body>
+</html>
+
