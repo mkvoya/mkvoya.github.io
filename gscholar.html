@@ -59,10 +59,12 @@ a {
         let entries = {};
 
         function parse_eml(text) {
-            let content = text.substr(text.search("--==="));
-            content = content.substr(content.search("\n\n"));
-            content = content.substr(0, content.search("--==="));
-            // content = content.replaceAll("\n", "");
+            text = text.replaceAll("\r", "");
+            let content = text.substr(text.search("\n\n"));
+            // content = content.substr(content.search("\n\n"));
+            // content = content.substr(0, content.search("--==="));
+            content = content.replaceAll("=\n", "");
+            content = content.replaceAll("3D", "");
             content = content.split('\n').map((x)=>x.trim()).reduce((x,y)=>x+y)
 
             parser = new DOMParser();
