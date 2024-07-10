@@ -60,16 +60,20 @@ a {
 
         function parse_eml(text) {
             text = text.replaceAll("\r", "");
-            // let content = text.substr(text.search("\n\n"));
-            // // content = content.substr(content.search("\n\n"));
-            // // content = content.substr(0, content.search("--==="));
-            // content = content.replaceAll("=\n", "");
-            // content = content.replaceAll("3D", "");
-            // content = content.split('\n').map((x)=>x.trim()).reduce((x,y)=>x+y)
-        let content = text.substr(text.search("base64\n") + "base64\n".length);
-        content = content.substr(0, content.search("--==="));
-        content = content.split('\n').map((x)=>x.trim()).reduce((x,y)=>x+y)
-        content = atob(content);
+            let content = text.substr(text.search("\n\n"));
+
+        if (text.search("base64\n") == -1) {
+            // content = content.substr(content.search("\n\n"));
+            // content = content.substr(0, content.search("--==="));
+            content = content.replaceAll("=\n", "");
+            content = content.replaceAll("3D", "");
+            content = content.split('\n').map((x)=>x.trim()).reduce((x,y)=>x+y)
+        } else {
+            content = content.substr(content.search("base64\n") + "base64\n".length);
+            content = content.substr(0, content.search("--==="));
+            content = content.split('\n').map((x)=>x.trim()).reduce((x,y)=>x+y)
+            content = atob(content);
+        }
 
 
             parser = new DOMParser();
