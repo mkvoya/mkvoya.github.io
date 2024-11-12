@@ -103,7 +103,7 @@
         for (row of rows) {
           id = '' + row['学号']
           name = row['姓名'] || row['助教姓名'];
-          salary = row['酬金'] || row['拟发放工资'] || row['总金额'] || 0;
+          salary = parseInt(row['酬金'] || row['拟发放工资'] || row['总金额'] || 0);
           let msg = `ID=${id}, name=${name}, salary=${salary}`;
           if (name === undefined)
           report_error("姓名有误!" + msg);
