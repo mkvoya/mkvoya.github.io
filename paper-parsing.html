@@ -1,0 +1,365 @@
+<!-- vim:sts=2 ts=2 sw=2 expandtab -->
+<!doctype html>
+<html>
+
+<head>
+    <title>Paper Parser</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css"
+        integrity="sha512-HqxHUkJM0SYcbvxUw5P60SzdOTy/QVwA1JJrvaXJv4q7lmbDZCmZaqz01UPOaQveoxfYRv1tHozWGPMcuTBuvQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        a {
+            color: #008f7a;
+        }
+
+        #drop_zone {
+            margin: 10px;
+            border: 3px solid green;
+            width: 300px;
+            height: 50px;
+        }
+    </style>
+</head>
+
+<body>
+    <section class="hero is-primary">
+        <div class="hero-body">
+            <div class="container">
+                <h1 class="title">
+                    Paper Parser
+                </h1>
+                <h2 class="subtitle">
+                    Support arXiv and Google Scholar
+                </h2>
+            </div>
+        </div>
+    </section>
+
+    <section class='container'>
+        <label>
+            Paste email content or Google Scholar HTML below and press Parse.
+        </label>
+        <textarea id='input' class="textarea"></textarea>
+        <div id="drop_zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
+            <p>Or drop .eml/.html file(s) here.</p>
+        </div>
+        <a class="button" onclick="parse();">Parse</a>
+        <a class="button" onclick="reset();">Reset</a>
+        <a class="button" onclick="markRestUninterested();">剩下的都不感兴趣</a>
+    </section>
+
+    <section class='container'>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Categories/Year</th>
+                    <th scope="col">Authors</th>
+                </tr>
+            </thead>
+            <tbody id='result'>
+            </tbody>
+        </table>
+    </section>
+
+    <script type='text/javascript'>
+        function reset() {
+            document.getElementById("input").value = '';
+            document.getElementById('result').innerHTML = '';
+        }
+
+        function parse() {
+            var text = document.getElementById("input").value;
+            return parse_text(text);
+        }
+
+        function detectSource(text) {
+            // 检查是否包含arXiv特征
+            if (text.includes('arXiv:') && text.includes('Categories:')) {
+                return 'arxiv';
+            }
+            // 检查是否包含Google Scholar特征
+            if (text.includes('Google Scholar') || text.includes('gs_ri') || text.includes('gs_or_cit')) {
+                return 'scholar';
+            }
+            return 'unknown';
+        }
+
+        function parseArxiv(text) {
+            let regex = new RegExp(
+                `arXiv:(?<id>[0-9.]*?)
+(.*?)
+Title:(?<title>.*?)
+Authors:(?<authors>.*?)
+Categories:(?<categories>.*?)
+`, 'gms');
+
+            var papers = [];
+            var match;
+            while ((match = regex.exec(text)) !== null) {
+                const paper = {
+                    id: match[1],
+                    title: match[3],
+                    authors: match[4],
+                    categories: match[5],
+                    url: 'https://arxiv.org/abs/' + match[1],
+                    source: 'arxiv'
+                };
+                papers.push(paper);
+            }
+            return papers;
+        }
+
+        function parseScholar(text) {
+            text = text.replaceAll("\r", "");
+            let content = text.substr(text.search("\n\n"));
+
+            if (text.search("base64\n") == -1) {
+                // content = content.substr(content.search("\n\n"));
+                // content = content.substr(0, content.search("--==="));
+                content = content.replaceAll("=\n", "");
+                content = content.replaceAll("3D", "");
+                content = content.split('\n').map((x) => x.trim()).reduce((x, y) => x + y)
+            } else {
+                content = content.substr(content.search("base64\n") + "base64\n".length);
+                content = content.substr(0, content.search("--==="));
+                content = content.split('\n').map((x) => x.trim()).reduce((x, y) => x + y)
+                content = atob(content);
+            }
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(content, 'text/html');
+            const papers = [];
+
+            const entries = {};
+            // 查找所有论文条目
+            doc.querySelectorAll(".gse_alrt_title").forEach((a) => {
+                let title = a.innerText;
+                if (title in entries)
+                    return;
+                let url = a.href;
+                let authors = a.parentElement.nextElementSibling.innerText;
+                entries[title] = [title, url, authors];
+                var tr = document.createElement('tr');
+                var td;
+                td = document.createElement('td');
+                var a = document.createElement('a');
+                a.innerText = title;
+                a.href = url;
+                a.target = '_blank';
+                td.appendChild(a);
+                tr.appendChild(td);
+                td = document.createElement('td');
+                td.innerText = 'gscholar';
+                tr.appendChild(td);
+                td = document.createElement('td');
+                td.innerText = authors;
+                tr.appendChild(td);
+                document.getElementById('result').appendChild(tr);
+
+                papers.push({
+                    id: url,
+                    title: title,
+                    authors: authors,
+                    categories: '',  // 使用年份作为分类
+                    url: url,
+                    source: 'scholar'
+                });
+            });
+            return papers;
+        }
+
+        function parse_text(text) {
+            function showNotification(message) {
+                const notification = document.createElement('div');
+                notification.textContent = message;
+                notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background-color: #333;
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+            opacity: 0.9;
+          `;
+                document.body.appendChild(notification);
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    notification.style.transition = 'opacity 0.5s ease';
+                    setTimeout(() => notification.remove(), 500);
+                }, 3000);
+            }
+
+            const source = detectSource(text);
+            showNotification('Detected source: ' + source);
+            let papers = [];
+
+            if (source === 'arxiv') {
+                papers = parseArxiv(text);
+            } else if (source === 'scholar') {
+                papers = parseScholar(text);
+            } else {
+                console.error('Unknown source format');
+                return;
+            }
+
+            if (papers.length === 0) {
+                console.error('No papers found');
+                return;
+            }
+
+            // 批量查询兴趣度
+            fetch('http://127.0.0.1:9898/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(papers)
+            })
+                .then(response => response.json())
+                .then(scores => {
+                    // 根据兴趣度显示论文
+                    papers.forEach((paper, index) => {
+                        const score = scores[index];
+                        var tr = document.createElement('tr');
+
+                        // 根据分数设置背景色
+                        const opacity = Math.min(score, 1);
+                        tr.style.backgroundColor = `rgba(144, 238, 144, ${opacity})`;
+
+                        var td = document.createElement('td');
+                        var a = document.createElement('a');
+                        a.innerText = paper.title;
+                        a.href = paper.url;
+                        a.target = '_blank';
+
+                        // 添加点击事件
+                        a.addEventListener('click', function (e) {
+                            fetch('http://127.0.0.1:9898/update', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(paper)
+                            });
+                        });
+
+                        td.appendChild(a);
+                        tr.appendChild(td);
+
+                        td = document.createElement('td');
+                        td.innerText = paper.categories;
+                        tr.appendChild(td);
+
+                        td = document.createElement('td');
+                        td.innerText = paper.authors;
+                        tr.appendChild(td);
+
+                        document.getElementById('result').appendChild(tr);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // 如果API调用失败，仍然显示论文但不带颜色
+                    papers.forEach(paper => {
+                        var tr = document.createElement('tr');
+                        var td = document.createElement('td');
+                        var a = document.createElement('a');
+                        a.innerText = paper.title;
+                        a.href = paper.url;
+                        a.target = '_blank';
+                        td.appendChild(a);
+                        tr.appendChild(td);
+                        td = document.createElement('td');
+                        td.innerText = paper.categories;
+                        tr.appendChild(td);
+                        td = document.createElement('td');
+                        td.innerText = paper.authors;
+                        tr.appendChild(td);
+                        document.getElementById('result').appendChild(tr);
+                    });
+                });
+        }
+
+        function dragOverHandler(ev) {
+            ev.preventDefault();
+        }
+
+        function dropHandler(ev) {
+            console.log("File(s) dropped");
+            ev.preventDefault();
+
+            if (ev.dataTransfer.items) {
+                [...ev.dataTransfer.items].forEach((item, i) => {
+                    if (item.kind === "file") {
+                        const file = item.getAsFile();
+                        console.log(`… file[${i}].name = ${file.name}`);
+                        const reader = new FileReader();
+                        reader.addEventListener('load', (event) => {
+                            parse_text(event.target.result);
+                        });
+                        reader.readAsText(file);
+                    }
+                });
+            } else {
+                [...ev.dataTransfer.files].forEach((file, i) => {
+                    console.log(`… file[${i}].name = ${file.name}`);
+                    const reader = new FileReader();
+                    reader.addEventListener('load', (event) => {
+                        parse_text(event.target.result);
+                    });
+                    reader.readAsText(file);
+                });
+            }
+        }
+
+        function markRestUninterested() {
+            const rows = document.getElementById('result').getElementsByTagName('tr');
+            const uninterestedPapers = [];
+
+            for (let row of rows) {
+                const backgroundColor = window.getComputedStyle(row).backgroundColor;
+                if (!backgroundColor || backgroundColor === 'rgba(0, 0, 0, 0)' ||
+                    backgroundColor === 'transparent' ||
+                    backgroundColor.includes('rgba(144, 238, 144, 0.1)')) {
+
+                    const link = row.querySelector('a');
+                    const title = link.innerText;
+                    const url = link.href;
+                    const id = url.includes('arxiv.org') ? url.split('/').pop() : url;
+                    const categories = row.children[1].innerText;
+                    const authors = row.children[2].innerText;
+
+                    uninterestedPapers.push({
+                        id: id,
+                        title: title,
+                        authors: authors,
+                        categories: categories,
+                        url: url,
+                        source: url.includes('arxiv.org') ? 'arxiv' : 'scholar'
+                    });
+                }
+            }
+
+            if (uninterestedPapers.length > 0) {
+                fetch('http://127.0.0.1:9898/update_uninterested', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(uninterestedPapers)
+                })
+                    .then(() => {
+                        parse();
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            }
+        }
+    </script>
+</body>
+
+</html>

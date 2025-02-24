@@ -43,6 +43,7 @@ a {
       </div>
       <a class="button" onclick="parse();">Parse</a>
       <a class="button" onclick="reset();">Reset</a>
+      <a class="button" onclick="markRestUninterested();">剩下的都不感兴趣</a>
     </section>
 
     <section class='container'>
@@ -84,29 +85,89 @@ Categories:(?<categories>.*?)
 `, 'gms');
 
           var match;
+          var papers = [];  // 存储所有论文信息
           while ((match = regex.exec(text)) !== null) {
-            id = match[1];
-            title = markKeywords(match[3]);
-            authors = markKeywords(match[4]);
-            categories = markKeywords(match[5]);
-            url = 'https://arxiv.org/abs/' + id;
-            var tr = document.createElement('tr');
-            var td;
-            td = document.createElement('td');
-            var a = document.createElement('a');
-            a.innerText = title;
-            a.href = url;
-            a.target = '_blank';
-            td.appendChild(a);
-            tr.appendChild(td);
-            td = document.createElement('td');
-            td.innerText = categories;
-            tr.appendChild(td);
-            td = document.createElement('td');
-            td.innerText = authors;
-            tr.appendChild(td);
-            document.getElementById('result').appendChild(tr);
+            const paper = {
+              id: match[1],
+              title: match[3],
+              authors: match[4],
+              categories: match[5],
+              url: 'https://arxiv.org/abs/' + match[1]
+            };
+            papers.push(paper);
           }
+
+          // 批量查询兴趣度
+          fetch('http://127.0.0.1:9898/ask', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(papers)
+          })
+          .then(response => response.json())
+          .then(scores => {
+            // 根据兴趣度显示论文
+            papers.forEach((paper, index) => {
+              const score = scores[index];
+              var tr = document.createElement('tr');
+              
+              // 根据分数设置背景色
+              const opacity = Math.min(score, 1);  // 限制最大透明度
+              tr.style.backgroundColor = `rgba(144, 238, 144, ${opacity})`;  // 使用绿色作为底色
+
+              var td = document.createElement('td');
+              var a = document.createElement('a');
+              a.innerText = paper.title;
+              a.href = paper.url;
+              a.target = '_blank';
+              
+              // 添加点击事件
+              a.addEventListener('click', function(e) {
+                fetch('http://127.0.0.1:9898/update', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(paper)
+                });
+              });
+
+              td.appendChild(a);
+              tr.appendChild(td);
+              
+              td = document.createElement('td');
+              td.innerText = paper.categories;
+              tr.appendChild(td);
+              
+              td = document.createElement('td');
+              td.innerText = paper.authors;
+              tr.appendChild(td);
+              
+              document.getElementById('result').appendChild(tr);
+            });
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            // 如果API调用失败，仍然显示论文但不带颜色
+            papers.forEach(paper => {
+              var tr = document.createElement('tr');
+              var td = document.createElement('td');
+              var a = document.createElement('a');
+              a.innerText = paper.title;
+              a.href = paper.url;
+              a.target = '_blank';
+              td.appendChild(a);
+              tr.appendChild(td);
+              td = document.createElement('td');
+              td.innerText = paper.categories;
+              tr.appendChild(td);
+              td = document.createElement('td');
+              td.innerText = paper.authors;
+              tr.appendChild(td);
+              document.getElementById('result').appendChild(tr);
+            });
+          });
         }
 
         function dragOverHandler(ev) {
@@ -147,6 +208,69 @@ Categories:(?<categories>.*?)
                 });
             }
         }
+
+        function markRestUninterested() {
+            // 获取所有论文行
+            const rows = document.getElementById('result').getElementsByTagName('tr');
+            const uninterestedPapers = [];
+            
+            // 遍历所有行，找出背景色较浅的（未点击过的）论文
+            for (let row of rows) {
+                const backgroundColor = window.getComputedStyle(row).backgroundColor;
+                // 检查背景色的透明度是否较低（表示较不感兴趣）
+                if (!backgroundColor || backgroundColor === 'rgba(0, 0, 0, 0)' || 
+                    backgroundColor === 'transparent' || 
+                    backgroundColor.includes('rgba(144, 238, 144, 0.1)')) {
+                    
+                    const link = row.querySelector('a');
+                    const title = link.innerText;
+                    const url = link.href;
+                    const id = url.split('/').pop();
+                    const categories = row.children[1].innerText;
+                    const authors = row.children[2].innerText;
+                    
+                    uninterestedPapers.push({
+                        id: id,
+                        title: title,
+                        authors: authors,
+                        categories: categories,
+                        url: url
+                    });
+                }
+            }
+            
+            // 发送到后端
+            if (uninterestedPapers.length > 0) {
+                fetch('http://127.0.0.1:9898/update_uninterested', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(uninterestedPapers)
+                })
+                .then(() => {
+                    // 重新获取所有论文的兴趣度
+                    parse();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+        }
+
+        // 在HTML中添加按钮
+        function addUninterestedButton() {
+            const container = document.querySelector('section.container');
+            const button = document.createElement('a');
+            button.className = 'button';
+            button.style.marginLeft = '10px';
+            button.innerText = '剩下的都不感兴趣';
+            button.onclick = markRestUninterested;
+            container.appendChild(button);
+        }
+
+        // 在页面加载完成后添加按钮
+        window.addEventListener('load', addUninterestedButton);
       </script>
 
 
