@@ -152,48 +152,60 @@ Categories:(?<categories>.*?)
             return papers;
         }
 
-        function parse_text(text) {
-            function showNotification(message) {
-                const notification = document.createElement('div');
-                notification.textContent = message;
-                notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 24px;
-            background-color: #333;
-            color: white;
-            border-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            z-index: 1000;
-            opacity: 0.9;
-          `;
-                document.body.appendChild(notification);
-                setTimeout(() => {
-                    notification.style.opacity = '0';
-                    notification.style.transition = 'opacity 0.5s ease';
-                    setTimeout(() => notification.remove(), 500);
-                }, 3000);
+        // 将showNotification函数移到全局作用域
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 24px;
+                border-radius: 4px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                z-index: 1000;
+                opacity: 0.9;
+                transition: opacity 0.5s ease;
+            `;
+
+            // 根据类型设置不同的背景色
+            if (type === 'success') {
+                notification.style.backgroundColor = '#4caf50';  // 绿色
+                notification.style.color = 'white';
+            } else if (type === 'error') {
+                notification.style.backgroundColor = '#f44336';  // 红色
+                notification.style.color = 'white';
+            } else {
+                notification.style.backgroundColor = '#333';  // 默认深灰色
+                notification.style.color = 'white';
             }
 
-            const source = detectSource(text);
-            showNotification('Detected source: ' + source);
-            let papers = [];
+            document.body.appendChild(notification);
 
+            // 3秒后淡出消失
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+
+        function parse_text_for_papers(text) {
+            const source = detectSource(text);
             if (source === 'arxiv') {
-                papers = parseArxiv(text);
+                return { papers: parseArxiv(text), source: 'arxiv' };
             } else if (source === 'scholar') {
-                papers = parseScholar(text);
+                return { papers: parseScholar(text), source: 'scholar' };
             } else {
                 console.error('Unknown source format');
-                return;
+                return { papers: [], source: 'unknown' };
             }
+        }
 
+        function ask_and_show_papers(papers) {
             if (papers.length === 0) {
                 console.error('No papers found');
                 return;
             }
-
             // 批量查询兴趣度
             fetch('http://127.0.0.1:9898/ask', {
                 method: 'POST',
@@ -221,12 +233,19 @@ Categories:(?<categories>.*?)
 
                         // 添加点击事件
                         a.addEventListener('click', function (e) {
+                            const tr = this.closest('tr');  // 获取当前行
                             fetch('http://127.0.0.1:9898/update', {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                 },
                                 body: JSON.stringify(paper)
+                            }).then(() => {
+                                // 点击后将背景色改为淡黄色
+                                tr.style.backgroundColor = 'rgba(255, 255, 224, 0.5)';  // 淡黄色
+                                showNotification('已记录感兴趣', 'success');  // 添加点击成功通知
+                            }).catch(error => {
+                                showNotification('记录失败', 'error');  // 添加错误通知
                             });
                         });
 
@@ -267,6 +286,20 @@ Categories:(?<categories>.*?)
                 });
         }
 
+        function parse_text(text) {
+            const { papers, source } = parse_text_for_papers(text);
+            if (source === 'unknown') {
+                showNotification('Unknown source format', 'error');
+                return;
+            }
+            showNotification('Detected source: ' + source, 'info');
+
+            // Sort papers by title
+            papers.sort((a, b) => a.title.localeCompare(b.title));
+            ask_and_show_papers(papers);
+        }
+
+
         function dragOverHandler(ev) {
             ev.preventDefault();
         }
@@ -275,28 +308,63 @@ Categories:(?<categories>.*?)
             console.log("File(s) dropped");
             ev.preventDefault();
 
-            if (ev.dataTransfer.items) {
-                [...ev.dataTransfer.items].forEach((item, i) => {
-                    if (item.kind === "file") {
-                        const file = item.getAsFile();
-                        console.log(`… file[${i}].name = ${file.name}`);
-                        const reader = new FileReader();
-                        reader.addEventListener('load', (event) => {
-                            parse_text(event.target.result);
-                        });
-                        reader.readAsText(file);
-                    }
-                });
-            } else {
-                [...ev.dataTransfer.files].forEach((file, i) => {
-                    console.log(`… file[${i}].name = ${file.name}`);
+            let filePromises = [];
+
+            const readFile = (file) => {
+                return new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.addEventListener('load', (event) => {
-                        parse_text(event.target.result);
-                    });
+                    reader.onload = (event) => {
+                        const { papers, source } = parse_text_for_papers(event.target.result);
+                        resolve({ papers, source });
+                    };
+                    reader.onerror = reject;
                     reader.readAsText(file);
                 });
+            };
+
+            if (ev.dataTransfer.items) {
+                filePromises = [...ev.dataTransfer.items]
+                    .filter(item => item.kind === "file")
+                    .map(item => {
+                        const file = item.getAsFile();
+                        console.log(`Processing file: ${file.name}`);
+                        return readFile(file);
+                    });
+            } else {
+                filePromises = [...ev.dataTransfer.files].map(file => {
+                    console.log(`Processing file: ${file.name}`);
+                    return readFile(file);
+                });
             }
+
+            // 等待所有文件读取完成
+            Promise.all(filePromises)
+                .then(results => {
+                    // 合并所有论文
+                    let allPapers = [];
+                    let sourceCount = {};
+
+                    results.forEach(result => {
+                        allPapers.push(...result.papers);
+                        sourceCount[result.source] = (sourceCount[result.source] || 0) + 1;
+                    });
+
+                    // 显示检测到的来源及其数量
+                    const sourceStr = Object.entries(sourceCount)
+                        .map(([source, count]) => `${source}(${count})`)
+                        .join(' and ');
+                    showNotification(`Detected sources: ${sourceStr}`, 'info');
+
+                    // 按标题排序
+                    allPapers.sort((a, b) => a.title.localeCompare(b.title));
+
+                    // 显示所有论文
+                    ask_and_show_papers(allPapers);
+                })
+                .catch(error => {
+                    console.error('Error reading files:', error);
+                    showNotification('Error reading files', 'error');
+                });
         }
 
         function markRestUninterested() {
@@ -305,9 +373,7 @@ Categories:(?<categories>.*?)
 
             for (let row of rows) {
                 const backgroundColor = window.getComputedStyle(row).backgroundColor;
-                if (!backgroundColor || backgroundColor === 'rgba(0, 0, 0, 0)' ||
-                    backgroundColor === 'transparent' ||
-                    backgroundColor.includes('rgba(144, 238, 144, 0.1)')) {
+                if (!backgroundColor || backgroundColor !== 'rgba(255, 255, 224, 0.5)') {
 
                     const link = row.querySelector('a');
                     const title = link.innerText;
@@ -336,10 +402,17 @@ Categories:(?<categories>.*?)
                     body: JSON.stringify(uninterestedPapers)
                 })
                     .then(() => {
-                        parse();
+                        showNotification('成功记录偏好', 'success');  // 显示成功通知
+                        for (let row of rows) {
+                            const backgroundColor = window.getComputedStyle(row).backgroundColor;
+                            if (!backgroundColor || backgroundColor !== 'rgba(255, 255, 224, 0.5)') {
+                                row.style.backgroundColor = 'rgba(128, 128, 128, 0.5)';
+                            }
+                        }
                     })
                     .catch(error => {
                         console.error('Error:', error);
+                        showNotification('记录偏好失败', 'error');  // 显示错误通知
                     });
             }
         }
