@@ -43,9 +43,9 @@
         <div id="drop_zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
             <p>Or drop .eml/.html file(s) here.</p>
         </div>
-        <a class="button" onclick="parse();">Parse</a>
-        <a class="button" onclick="reset();">Reset</a>
-        <a class="button" onclick="markRestUninterested();">剩下的都不感兴趣</a>
+        <a class="button" onclick="parse(event);">Parse</a>
+        <a class="button" onclick="reset(event);">Reset</a>
+        <a class="button" onclick="markRestUninterested(event);">剩下的都不感兴趣</a>
     </section>
 
     <section class='container'>
@@ -63,12 +63,14 @@
     </section>
 
     <script type='text/javascript'>
-        function reset() {
+        function reset(event) {
+            event.preventDefault();
             document.getElementById("input").value = '';
             document.getElementById('result').innerHTML = '';
         }
 
-        function parse() {
+        function parse(event) {
+            event.preventDefault();
             var text = document.getElementById("input").value;
             return parse_text(text);
         }
@@ -234,7 +236,9 @@ Categories:(?<categories>.*?)
 
                         // 添加点击事件
                         a.addEventListener('click', function (e) {
+                            e.preventDefault();
                             const tr = this.closest('tr');  // 获取当前行
+                            const url = this.href; 
                             fetch('http://127.0.0.1:9898/update', {
                                 mode: 'cors',
                                 method: 'POST',
@@ -246,8 +250,10 @@ Categories:(?<categories>.*?)
                                 // 点击后将背景色改为淡黄色
                                 tr.style.backgroundColor = 'rgba(255, 255, 224, 0.5)';  // 淡黄色
                                 showNotification('已记录感兴趣', 'success');  // 添加点击成功通知
+                                window.open(url, '_blank');
                             }).catch(error => {
                                 showNotification('记录失败', 'error');  // 添加错误通知
+                                window.open(url, '_blank');
                             });
                         });
 
@@ -369,7 +375,8 @@ Categories:(?<categories>.*?)
                 });
         }
 
-        function markRestUninterested() {
+        function markRestUninterested(event) {
+            event.preventDefault();
             const rows = document.getElementById('result').getElementsByTagName('tr');
             const uninterestedPapers = [];
 
