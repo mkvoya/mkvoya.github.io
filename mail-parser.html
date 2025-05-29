@@ -208,6 +208,7 @@ Categories:(?<categories>.*?)
             }
             // 批量查询兴趣度
             fetch('http://127.0.0.1:9898/ask', {
+                mode: 'cors',
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -235,6 +236,7 @@ Categories:(?<categories>.*?)
                         a.addEventListener('click', function (e) {
                             const tr = this.closest('tr');  // 获取当前行
                             fetch('http://127.0.0.1:9898/update', {
+                                mode: 'cors',
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -395,6 +397,7 @@ Categories:(?<categories>.*?)
 
             if (uninterestedPapers.length > 0) {
                 fetch('http://127.0.0.1:9898/update_uninterested', {
+                    mode: 'cors',
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
