@@ -13,4 +13,4 @@ paper:
 
 # 清理生成的数据文件
 clean:
-	rm -rf recommender_data/ 
+	rm -rf recommender_data/

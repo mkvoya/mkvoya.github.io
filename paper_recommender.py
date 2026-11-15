@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import List
 import pickle
@@ -20,6 +21,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 确保所有响应（包括 OPTIONS）都有 Private-Network 头
+@app.middleware("http")
+async def add_private_network_header(request: Request, call_next):
+    # 如果是预检请求 (OPTIONS)，FastAPI + CORSMiddleware 会生成一个 Response
+    if request.method == "OPTIONS":
+        response = Response()
+    else:
+        response = await call_next(request)
+
+    # 给所有响应加上 PNA 头
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 # 数据模型
 class Paper(BaseModel):
     id: str
@@ -183,4 +200,4 @@ async def update_uninterested(papers: List[Paper]):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=9898) 
+    uvicorn.run(app, host="127.0.0.1", port=9898)
